@@ -1,0 +1,31 @@
+{
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.3",
+    "@notionhq/client": "^2.2.15",
+    "body-parser": "^1.20.3",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  },
+  "name": "notionmcp",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type":"module",
+  "bin":{
+    "notion":"./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  },
+  "description": "",
+  "files": [
+    "build"
+  ]
+}
