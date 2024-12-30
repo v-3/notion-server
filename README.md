@@ -101,6 +101,43 @@ Update an existing Notion page.
 }
 ```
 
+## Managing Notion Permissions
+
+### Setting Up Integration
+1. Go to [Notion Integrations page](https://www.notion.so/my-integrations)
+2. Click "New integration" and give it a name
+3. Configure the following permissions based on your needs:
+   - Content Capabilities:
+     - Read content
+     - Update content
+     - Insert content
+   - Comment Capabilities (optional):
+     - Read comments
+     - Create comments
+   - User Information:
+     - Read user information
+
+### Getting the Integration Token
+1. After creating the integration, you'll see a "Secret Key"
+2. Copy this key and use it in:
+   - The server's `.env` file as `NOTION_API_KEY`
+   - Your Claude Desktop config file in the `env` section
+
+### Granting Page Access
+The integration needs explicit permission to access specific pages in your Notion workspace:
+
+1. Open the Notion page you want to grant access to
+2. Click the "..." menu in the top right
+3. Select "Connections"
+4. Find your integration in the list and click to add it
+5. Repeat for each page you want the integration to access
+
+### Important Notes
+- Page permissions are hierarchical - granting access to a parent page automatically grants access to all child pages
+- You can revoke access at any time by removing the integration from a page's connections
+- For optimal security, grant access only to pages that require integration functionality
+- Regularly audit page connections to maintain proper access control
+
 ## Security Considerations
 
 - Store your Notion API key securely
