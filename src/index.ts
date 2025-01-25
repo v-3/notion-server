@@ -447,69 +447,100 @@ const toolHandlers = {
 	async read_page(args: unknown) {
 		const { pageId } = schemas.toolInputs.readPage.parse(args);
 
-		const [blocksResponse, pageResponse] = await Promise.all([
-			notion.blocks.children.list({ block_id: pageId }),
-			notion.pages.retrieve({ page_id: pageId }),
-		]);
+		try {
+			const [blocksResponse, pageResponse] = await Promise.all([
+				notion.blocks.children.list({ block_id: pageId }),
+				notion.pages.retrieve({ page_id: pageId }),
+			]);
 
-		const page = schemas.notionPage.parse(pageResponse);
+			const page = schemas.notionPage.parse(pageResponse);
 
-		// Get title
-		const titleProp = Object.values(page.properties).find((prop) => prop.type === "title");
-		const title = titleProp?.type === "title" ? titleProp.title[0]?.plain_text || "Untitled" : "Untitled";
+			// Get title
+			const titleProp = Object.values(page.properties).find((prop) => prop.type === "title");
+			const title = titleProp?.type === "title" ? titleProp.title[0]?.plain_text || "Untitled" : "Untitled";
 
-		// Convert blocks to text content
-		const blocks = (blocksResponse.results as Array<{ type: string; id: string;[key: string]: any }>).map(block => {
-			const type = block.type;
-			const textContent = block[type]?.rich_text?.map((text: any) => text.plain_text).join("") || "";
-			let formattedContent = "";
+			// Process blocks and collect child pages/databases
+			const childPages: string[] = [];
+			const childDatabases: string[] = [];
+			const contentBlocks: string[] = [];
 
-			switch (type) {
-				case "paragraph":
-				case "heading_1":
-				case "heading_2":
-				case "heading_3":
-					formattedContent = textContent;
-					break;
-				case "bulleted_list_item":
-				case "numbered_list_item":
-					formattedContent = "• " + textContent;
-					break;
-				case "to_do":
-					const checked = block.to_do?.checked ? "[x]" : "[ ]";
-					formattedContent = checked + " " + textContent;
-					break;
-				case "code":
-					formattedContent = "```\n" + textContent + "\n```";
-					break;
-				default:
-					formattedContent = textContent;
+			for (const block of blocksResponse.results as Array<{ type: string; id: string;[key: string]: any }>) {
+				const type = block.type;
+
+				if (type === "child_page") {
+					childPages.push(`📄 ${block.child_page.title || "Untitled Page"} (ID: ${block.id})`);
+					continue;
+				}
+
+				if (type === "child_database") {
+					childDatabases.push(`📊 ${block.child_database.title || "Untitled Database"} (ID: ${block.id})`);
+					continue;
+				}
+
+				const textContent = block[type]?.rich_text?.map((text: any) => text.plain_text).join("") || "";
+				let formattedContent = "";
+
+				switch (type) {
+					case "paragraph":
+					case "heading_1":
+					case "heading_2":
+					case "heading_3":
+						formattedContent = textContent;
+						break;
+					case "bulleted_list_item":
+					case "numbered_list_item":
+						formattedContent = "• " + textContent;
+						break;
+					case "to_do":
+						const checked = block.to_do?.checked ? "[x]" : "[ ]";
+						formattedContent = checked + " " + textContent;
+						break;
+					case "code":
+						formattedContent = "```\n" + textContent + "\n```";
+						break;
+					default:
+						formattedContent = textContent;
+				}
+
+				if (formattedContent) {
+					contentBlocks.push(formattedContent);
+				}
+			}
+
+			// Combine all content
+			let output = `# ${title}\n\n`;
+
+			if (contentBlocks.length > 0) {
+				output += contentBlocks.join("\n") + "\n\n";
+			}
+
+			if (childPages.length > 0) {
+				output += "## Child Pages\n" + childPages.join("\n") + "\n\n";
+			}
+
+			if (childDatabases.length > 0) {
+				output += "## Child Databases\n" + childDatabases.join("\n") + "\n";
 			}
 
 			return {
-				id: block.id,
-				type,
-				content: formattedContent
+				content: [
+					{
+						type: "text" as const,
+						text: output.trim(),
+					},
+				],
 			};
-		});
-
-		const content = blocks.map((block: { id: string; type: string; content: string }) => {
-			// Skip empty paragraphs
-			if (block.type === "paragraph" && !block.content) {
-				return "";
-			}
-			// For non-empty blocks, format them nicely
-			return block.content ? `${block.content}` : "";
-		}).filter(line => line).join("\n");
-
-		return {
-			content: [
-				{
-					type: "text" as const,
-					text: `# ${title}\n\n${content}`,
-				},
-			],
-		};
+		} catch (error) {
+			console.error("Error reading page:", error);
+			return {
+				content: [
+					{
+						type: "text" as const,
+						text: formatError(error),
+					},
+				],
+			};
+		}
 	},
 
 	async create_page(args: unknown) {
