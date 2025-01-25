@@ -468,12 +468,12 @@ const toolHandlers = {
 				const type = block.type;
 
 				if (type === "child_page") {
-					childPages.push(`📄 ${block.child_page.title || "Untitled Page"} (ID: ${block.id})`);
+					childPages.push(`📄 ${block.child_page.title || "Untitled Page"} (ID: ${block.id.replace(/-/g, "")})`);
 					continue;
 				}
 
 				if (type === "child_database") {
-					childDatabases.push(`📊 ${block.child_database.title || "Untitled Database"} (ID: ${block.id})`);
+					childDatabases.push(`📊 ${block.child_database.title || "Untitled Database"} (ID: ${block.id.replace(/-/g, "")})`);
 					continue;
 				}
 
