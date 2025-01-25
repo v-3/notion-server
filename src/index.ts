@@ -142,7 +142,7 @@ const TOOL_DEFINITIONS = [
 	},
 	{
 		name: "read_page",
-		description: "Read a page's content and shows block IDs with their types (needed for block operations)",
+		description: "Read a regular page's content (not for databases - use retrieve_database for databases). Shows block IDs with their types (needed for block operations)",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -420,7 +420,13 @@ const toolHandlers = {
 			.map((page: any) => {
 				let title = "Untitled";
 				try {
-					if (page.properties) {
+					// Extract title from URL
+					const urlMatch = page.url.match(/\/([^/]+)-[^/]+$/);
+					if (urlMatch) {
+						title = decodeURIComponent(urlMatch[1].replace(/-/g, ' '));
+					}
+					// If no title from URL or it's still "Untitled", try properties
+					if (title === "Untitled" && page.properties) {
 						const titleProperty = page.properties.title || page.properties.Name;
 						if (titleProperty?.title?.[0]?.plain_text) {
 							title = titleProperty.title[0].plain_text;
