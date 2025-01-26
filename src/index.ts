@@ -64,6 +64,8 @@ const schemas = {
 				"to_do",
 				"image"
 			]).optional(),
+			mode: z.enum(["replace", "append", "merge"]).default("replace"),  // Add this
+			position: z.enum(["start", "end"]).default("end")                 // Add this
 		}),
 		retrieveDatabase: z.object({
 			databaseId: z.string(),
@@ -200,6 +202,18 @@ const TOOL_DEFINITIONS = [
 					description: "Type of content to append",
 					optional: true,
 				},
+				mode: {                                                    // Add this
+					type: "string",
+					enum: ["replace", "append", "merge"],
+					description: "Update mode: replace all content, append to existing, or merge",
+					optional: true,
+				},
+				position: {                                               // Add this
+					type: "string",
+					enum: ["start", "end"],
+					description: "Position for merge mode: start or end",
+					optional: true,
+				}
 			},
 			required: ["pageId", "content"],
 		},
@@ -789,207 +803,236 @@ const toolHandlers = {
 	},
 
 	async update_page(args: unknown) {
-		const { pageId, content: newContent, type = "paragraph" } = schemas.toolInputs.updatePage.parse(args);
+		const { pageId, content: newContent, type = "paragraph", mode = "replace", position = "end" } = schemas.toolInputs.updatePage.parse(args);
+		try {
+			// Get existing blocks and delete them
+			const blocks = await notion.blocks.children.list({ block_id: pageId });
+			const backup = blocks.results;
 
-		// Get existing blocks and delete them
-		const blocks = await notion.blocks.children.list({ block_id: pageId });
-		for (const block of blocks.results) {
-			await notion.blocks.delete({ block_id: block.id });
-		}
+			// Helper to create blocks array based on content type and handle multiple lines
+			const createBlocks = (content: string, _type: string): any[] => {
+				const lines = content.split('\n');
+				const blocks: any[] = [];
+				let currentCodeBlock: any = null;
 
-		// Helper to create blocks array based on content type and handle multiple lines
-		const createBlocks = (content: string, _type: string): any[] => {
-			const lines = content.split('\n');
-			const blocks: any[] = [];
-			let currentCodeBlock: any = null;
+				for (let i = 0; i < lines.length; i++) {
+					const line = lines[i];
+					const trimmedLine = line.trim();
 
-			for (let i = 0; i < lines.length; i++) {
-				const line = lines[i];
-				const trimmedLine = line.trim();
-
-				// Handle code blocks
-				if (trimmedLine.startsWith('```')) {
-					if (currentCodeBlock) {
-						// End code block
-						blocks.push(currentCodeBlock);
-						currentCodeBlock = null;
-					} else {
-						// Start code block
-						const language = trimmedLine.slice(3).trim();
-						currentCodeBlock = {
-							object: "block",
-							type: "code",
-							code: {
-								rich_text: [],
-								language: language || "plain text"
-							}
-						};
+					// Handle code blocks
+					if (trimmedLine.startsWith('```')) {
+						if (currentCodeBlock) {
+							// End code block
+							blocks.push(currentCodeBlock);
+							currentCodeBlock = null;
+						} else {
+							// Start code block
+							const language = trimmedLine.slice(3).trim();
+							currentCodeBlock = {
+								object: "block",
+								type: "code",
+								code: {
+									rich_text: [],
+									language: language || "plain text"
+								}
+							};
+						}
+						continue;
 					}
-					continue;
-				}
 
-				if (currentCodeBlock) {
-					// Add line to current code block
-					currentCodeBlock.code.rich_text.push({
-						type: "text",
-						text: { content: line }
-					});
-					continue;
-				}
+					if (currentCodeBlock) {
+						// Add line to current code block
+						currentCodeBlock.code.rich_text.push({
+							type: "text",
+							text: { content: line }
+						});
+						continue;
+					}
 
-				// Handle other block types
-				let block: any = null;
+					// Handle other block types
+					let block: any = null;
 
-				if (trimmedLine === '') {
-					block = {
-						object: "block",
-						type: "paragraph",
-						paragraph: { rich_text: [] }
-					};
-				} else if (trimmedLine.startsWith('# ')) {
-					block = {
-						object: "block",
-						type: "heading_1",
-						heading_1: {
-							rich_text: [{
-								type: "text",
-								text: { content: trimmedLine.substring(2) }
-							}]
-						}
-					};
-				} else if (trimmedLine.startsWith('## ')) {
-					block = {
-						object: "block",
-						type: "heading_2",
-						heading_2: {
-							rich_text: [{
-								type: "text",
-								text: { content: trimmedLine.substring(3) }
-							}]
-						}
-					};
-				} else if (trimmedLine.startsWith('### ')) {
-					block = {
-						object: "block",
-						type: "heading_3",
-						heading_3: {
-							rich_text: [{
-								type: "text",
-								text: { content: trimmedLine.substring(4) }
-							}]
-						}
-					};
-				} else if (trimmedLine.startsWith('- [ ] ')) {
-					block = {
-						object: "block",
-						type: "to_do",
-						to_do: {
-							rich_text: [{
-								type: "text",
-								text: { content: trimmedLine.substring(6) }
-							}],
-							checked: false
-						}
-					};
-				} else if (trimmedLine.startsWith('- [x] ')) {
-					block = {
-						object: "block",
-						type: "to_do",
-						to_do: {
-							rich_text: [{
-								type: "text",
-								text: { content: trimmedLine.substring(6) }
-							}],
-							checked: true
-						}
-					};
-				} else if (trimmedLine.startsWith('- ')) {
-					block = {
-						object: "block",
-						type: "bulleted_list_item",
-						bulleted_list_item: {
-							rich_text: [{
-								type: "text",
-								text: { content: trimmedLine.substring(2) }
-							}]
-						}
-					};
-				} else if (trimmedLine.startsWith('> ')) {
-					block = {
-						object: "block",
-						type: "quote",
-						quote: {
-							rich_text: [{
-								type: "text",
-								text: { content: trimmedLine.substring(2) }
-							}]
-						}
-					};
-				} else if (trimmedLine.startsWith('---')) {
-					block = {
-						object: "block",
-						type: "divider",
-						divider: {}
-					};
-				} else if (trimmedLine.match(/^!\[.*\]\(.*\)$/)) {
-					// Image in markdown format: ![alt](url)
-					const match = trimmedLine.match(/^!\[(.*)\]\((.*)\)$/);
-					if (match) {
+					if (trimmedLine === '') {
 						block = {
 							object: "block",
-							type: "image",
-							image: {
-								type: "external",
-								external: { url: match[2] },
-								caption: match[1] ? [{
+							type: "paragraph",
+							paragraph: { rich_text: [] }
+						};
+					} else if (trimmedLine.startsWith('# ')) {
+						block = {
+							object: "block",
+							type: "heading_1",
+							heading_1: {
+								rich_text: [{
 									type: "text",
-									text: { content: match[1] }
-								}] : []
+									text: { content: trimmedLine.substring(2) }
+								}]
+							}
+						};
+					} else if (trimmedLine.startsWith('## ')) {
+						block = {
+							object: "block",
+							type: "heading_2",
+							heading_2: {
+								rich_text: [{
+									type: "text",
+									text: { content: trimmedLine.substring(3) }
+								}]
+							}
+						};
+					} else if (trimmedLine.startsWith('### ')) {
+						block = {
+							object: "block",
+							type: "heading_3",
+							heading_3: {
+								rich_text: [{
+									type: "text",
+									text: { content: trimmedLine.substring(4) }
+								}]
+							}
+						};
+					} else if (trimmedLine.startsWith('- [ ] ')) {
+						block = {
+							object: "block",
+							type: "to_do",
+							to_do: {
+								rich_text: [{
+									type: "text",
+									text: { content: trimmedLine.substring(6) }
+								}],
+								checked: false
+							}
+						};
+					} else if (trimmedLine.startsWith('- [x] ')) {
+						block = {
+							object: "block",
+							type: "to_do",
+							to_do: {
+								rich_text: [{
+									type: "text",
+									text: { content: trimmedLine.substring(6) }
+								}],
+								checked: true
+							}
+						};
+					} else if (trimmedLine.startsWith('- ')) {
+						block = {
+							object: "block",
+							type: "bulleted_list_item",
+							bulleted_list_item: {
+								rich_text: [{
+									type: "text",
+									text: { content: trimmedLine.substring(2) }
+								}]
+							}
+						};
+					} else if (trimmedLine.startsWith('> ')) {
+						block = {
+							object: "block",
+							type: "quote",
+							quote: {
+								rich_text: [{
+									type: "text",
+									text: { content: trimmedLine.substring(2) }
+								}]
+							}
+						};
+					} else if (trimmedLine.startsWith('---')) {
+						block = {
+							object: "block",
+							type: "divider",
+							divider: {}
+						};
+					} else if (trimmedLine.match(/^!\[.*\]\(.*\)$/)) {
+						// Image in markdown format: ![alt](url)
+						const match = trimmedLine.match(/^!\[(.*)\]\((.*)\)$/);
+						if (match) {
+							block = {
+								object: "block",
+								type: "image",
+								image: {
+									type: "external",
+									external: { url: match[2] },
+									caption: match[1] ? [{
+										type: "text",
+										text: { content: match[1] }
+									}] : []
+								}
+							};
+						}
+					} else {
+						block = {
+							object: "block",
+							type: "paragraph",
+							paragraph: {
+								rich_text: [{
+									type: "text",
+									text: { content: line }
+								}]
 							}
 						};
 					}
+
+					if (block) {
+						blocks.push(block);
+					}
+				}
+
+				// Add any remaining code block
+				if (currentCodeBlock) {
+					blocks.push(currentCodeBlock);
+				}
+
+				return blocks;
+			};
+			if (mode === "replace" || mode === "merge") {
+				if (backup.length > 0) {
+					console.warn(`Deleting ${backup.length} existing blocks`);
+				}
+				for (const block of backup) {
+					await notion.blocks.delete({ block_id: block.id });
+				}
+			} try {
+				const newBlocks = createBlocks(newContent, type);
+
+				if (mode === "merge") {
+					const mergedBlocks = position === "start"
+						? [...newBlocks, ...backup]
+						: [...backup, ...newBlocks];
+
+					await notion.blocks.children.append({
+						block_id: pageId,
+						children: mergedBlocks,
+					});
 				} else {
-					block = {
-						object: "block",
-						type: "paragraph",
-						paragraph: {
-							rich_text: [{
-								type: "text",
-								text: { content: line }
-							}]
-						}
-					};
+					await notion.blocks.children.append({
+						block_id: pageId,
+						children: newBlocks,
+					});
 				}
 
-				if (block) {
-					blocks.push(block);
-				}
-			}
-
-			// Add any remaining code block
-			if (currentCodeBlock) {
-				blocks.push(currentCodeBlock);
-			}
-
-			return blocks;
-		};
-
-		// Append the new content with appropriate type
-		await notion.blocks.children.append({
-			block_id: pageId,
-			children: createBlocks(newContent, type),
-		});
-
-		return {
-			content: [
-				{
-					type: "text" as const,
-					text: `Successfully updated page: ${pageId}`,
-				},
-			],
-		};
+				return {
+					content: [
+						{
+							type: "text" as const,
+							text: `Successfully updated page: ${pageId}`,
+						},
+					],
+				};
+			}catch(error){
+				throw error;
+			}}catch (error) {
+			console.error("Error updating page:", error);
+			return {
+				content: [
+					{
+						type: "text" as const,
+						text: formatError(error),
+					},
+				],
+			};
+		}
 	},
-
 	async add_comment(args: unknown) {
 		const { pageId, content } = args as any;
 
