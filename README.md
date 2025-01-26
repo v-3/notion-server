@@ -1,56 +1,48 @@
 # Notion MCP Server
 
-A Model Context Protocol (MCP) server that provides seamless integration with Notion, featuring enhanced markdown support, comprehensive database operations, and improved error handling.
+A Model Context Protocol (MCP) server that provides seamless integration with Notion. This server enables Language Models to interact with your Notion workspace through standardized tools for searching, reading, creating, and updating pages and databases.
 
-## Features
+## 🌟 Key Features
+
+### Page Operations
+- 🔍 Search through your Notion workspace
+- 📝 Create new pages with rich markdown content
+- 📖 Read page content with clean formatting
+- 🔄 Update existing pages
+- 💬 Add and retrieve comments
+- 🧱 Block-level operations (update, delete)
 
 ### Enhanced Markdown Support
-- Headings (h1, h2, h3)
+- Multiple heading levels (H1-H3)
 - Code blocks with language support
-- Todo items with checkbox states (- [ ] and - [x])
+- Interactive todo items with checkbox states
 - Blockquotes with multi-line support
-- Dividers
+- Horizontal dividers
 - Images with captions
 - Nested bullet points
 
-### Comprehensive Database Support
+### Database Operations
 - Create and manage databases
-- Create database items with proper property handling
-- Query databases with filters and sorting
-- Update database items and properties
+- Add and update database items
+- Query with filters and sorting
 - Support for various property types:
-  - Title
-  - Rich text
-  - Number
-  - Select
-  - Multi-select
-  - Date
-  - Checkbox
+  - Title, Rich text, Number
+  - Select, Multi-select
+  - Date, Checkbox
+  - And more!
 
-### Page Operations
-- Search through your Notion workspace
-- Create pages with markdown content
-- Read page content with clean formatting
-- Update existing pages
-- Add and retrieve comments
-- Block-level operations (update, delete)
+## 🚀 Getting Started
 
-### Error Handling
-- Detailed error messages with API response details
-- Proper validation of input parameters
-- Enhanced debugging information
-
-## Prerequisites
-
+### Prerequisites
 - Node.js (v16 or higher)
-- A Notion API key
+- Notion API key
 - MCP-compatible client (e.g., Claude Desktop)
 
-## Installation
+### Installation
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/sweir1/notion-server.git
+git clone https://github.com/v-3/notion-server.git
 cd notion-server
 ```
 
@@ -59,8 +51,12 @@ cd notion-server
 npm install
 ```
 
-3. Set your Notion API key:
+3. Set up your environment:
 ```bash
+# Create .env file
+echo "NOTION_API_KEY=your_notion_api_key_here" > .env
+
+# Or export directly
 export NOTION_API_KEY=your_notion_api_key_here
 ```
 
@@ -69,58 +65,135 @@ export NOTION_API_KEY=your_notion_api_key_here
 npm run build
 ```
 
-## Usage Examples
+## 🔧 Configuration
+
+### Claude Desktop Setup
+
+1. Update your Claude Desktop configuration (`claude_desktop_config.json`):
+```json
+{
+    "mcpServers": {
+        "notion": {
+            "command": "node",
+            "args": ["/absolute/path/to/notion-server/build/index.js"],
+            "env": {
+                "NOTION_API_KEY": "your_notion_api_key_here"
+            }
+        }
+    }
+}
+```
+
+2. Restart Claude Desktop to apply changes
+
+## 🛠️ Available Tools
+
+### Page Operations
+```typescript
+// Search pages
+{
+    query: string // Search query
+}
+
+// Read page
+{
+    pageId: string // ID of the page to read
+}
+
+// Create page
+{
+    title?: string,      // Page title
+    content?: string,    // Page content in markdown
+    parentPageId: string // Parent page ID
+    properties?: object  // For database items
+}
+
+// Update page
+{
+    pageId: string,   // Page ID to update
+    content: string,  // New content
+    type?: string    // Content type
+}
+```
+
+### Database Operations
+```typescript
+// Create database
+{
+    parentPageId: string,
+    title: string,
+    properties: object
+}
+
+// Query database
+{
+    databaseId: string,
+    filter?: object,
+    sort?: object
+}
+```
+
+## 🔐 Setting Up Notion Access
+
+### Creating an Integration
+1. Visit [Notion Integrations](https://www.notion.so/my-integrations)
+2. Click "New integration"
+3. Configure permissions:
+   - Content: Read, Update, Insert
+   - Comments: Read, Create
+   - User Information: Read
+
+### Connecting Pages
+1. Open your Notion page
+2. Click "..." menu → "Connections"
+3. Add your integration
+4. Repeat for other pages as needed
+
+## 📝 Usage Examples
 
 ### Creating a Page
 ```typescript
 const result = await notion.create_page({
-  parentPageId: "your_parent_page_id",
+  parentPageId: "page_id",
   title: "My Page",
-  content: "# Welcome\nThis is a test page with markdown support.\n\n## Code Example\n```javascript\nconsole.log('Hello World');\n```"
-});
-```
-
-### Creating a Database Item
-```typescript
-const result = await notion.create_page({
-  parentPageId: "your_database_id",
-  properties: {
-    Name: {
-      title: [{ text: { content: "My Item" } }]
-    },
-    Status: {
-      select: { name: "In Progress" }
-    },
-    Priority: {
-      number: 1
-    }
-  },
-  content: "# Details\nThis is a database item with properties."
+  content: "# Welcome\nThis is a test page."
 });
 ```
 
 ### Querying a Database
 ```typescript
 const result = await notion.query_database({
-  databaseId: "your_database_id",
+  databaseId: "db_id",
   filter: {
     property: "Status",
     select: {
       equals: "In Progress"
     }
-  },
-  sort: {
-    property: "Priority",
-    direction: "descending"
   }
 });
 ```
 
-## Credits
+## 🤝 Contributing
 
-This is a significantly enhanced fork of [v-3/notion-server](https://github.com/v-3/notion-server) with the following improvements:
+Contributions are welcome! Please:
+1. Fork the repository
+2. Create a feature branch
+3. Submit a Pull Request
+
+## 📜 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+This project has been significantly improved by [sweir1/notion-server](https://github.com/sweir1/notion-server), who has made following updates:
 - Enhanced markdown support with more block types
 - Comprehensive database operations
-- Better error handling and debugging
-- Improved property handling for database items
+- Improved error handling and debugging
+- Better property handling for database items
 - Cleaner page output formatting
+
+To use sweir1's version, you can clone their repository:
+```bash
+git clone https://github.com/sweir1/notion-server.git
+```
