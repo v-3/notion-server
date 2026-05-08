@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.3",
+    "@modelcontextprotocol/sdk": "^1.1.1",
     "@notionhq/client": "^2.2.15",
     "body-parser": "^1.20.3",
     "dotenv": "^16.4.7",
@@ -8,14 +8,17 @@
   },
   "name": "notionmcp",
   "version": "1.0.0",
-  "main": "index.js",
-  "type":"module",
-  "bin":{
-    "notion":"./build/index.js"
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "notion": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "build": "tsc && node -e \"require('fs').chmodSync('dist/index.js', '755')\"",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "tickets:sync": "node C:/Users/mike/.tickets/scripts/sync.js",
+    "tickets:create": "node C:/Users/mike/.tickets/scripts/create.js",
+    "tickets:status": "node C:/Users/mike/.tickets/scripts/status.js"
   },
   "keywords": [],
   "author": "",
@@ -26,6 +29,6 @@
   },
   "description": "",
   "files": [
-    "build"
+    "dist"
   ]
 }
